@@ -4,57 +4,30 @@ import os
 import time
 from collections import deque
 
-def fast_ncc_match(search_img, template):
-    """手写 NCC：修复低方差区域导致的分数爆炸"""
-    H, W = search_img.shape
-    h, w = template.shape
-    if H < h or W < w:
-        return -1.0, (0, 0)
+from ncc import fast_ncc_match
 
-    img = search_img.astype(np.float64)
-    tmpl = template.astype(np.float64)
-    N = h * w
+# ======================== 可调参数 ========================
+GLOBAL_SEARCH_SCALES = np.arange(0.5, 2.1, 0.25)
+LOCAL_SCALE_FACTORS = [0.9, 1.0, 1.1]
+LOCAL_SEARCH_PADDING = 50
+MIN_TEMPLATE_SIZE = 10
+TRACKING_SCORE_THRESHOLD = 0.5
+TRAJECTORY_MAXLEN = 800
+PROGRESS_INTERVAL = 50
 
-    # 1. 局部均值
-    mean_kernel = np.ones((h, w), dtype=np.float64) / N
-    mean_I = cv2.filter2D(img, cv2.CV_64F, mean_kernel, anchor=(0,0))
-    mean_I = mean_I[: H - h + 1, : W - w + 1]
+# ======================== 可视化参数 ========================
+FONT = cv2.FONT_HERSHEY_SIMPLEX
+FONT_SCALE_INFO = 0.55
+FONT_SCALE_LOST = 0.9
+FONT_THICKNESS = 2
+COLOR_GREEN = (0, 255, 0)
+COLOR_RED = (0, 0, 255)
+COLOR_BLUE = (255, 0, 0)
+BOX_THICKNESS = 2
+TRAJECTORY_THICKNESS = 2
+CIRCLE_RADIUS = 4
+LOST_TEXT_POS = (30, 50)
 
-    # 2. 局部标准差（σ_I * sqrt(N)）
-    sq = img ** 2
-    mean_sq = cv2.filter2D(sq, cv2.CV_64F, mean_kernel, anchor=(0,0))
-    mean_sq = mean_sq[: H - h + 1, : W - w + 1]
-    var_I = mean_sq - mean_I * mean_I
-    var_I = np.maximum(var_I, 0.0)
-    std_I = np.sqrt(var_I * N)          # 即 sqrt(Σ (I - μ_I)^2)
-
-    # 3. 模板统计量
-    t_mean = tmpl.mean()
-    t_diff = tmpl - t_mean
-    t_sq_sum = np.sum(t_diff * t_diff)
-    t_std = np.sqrt(t_sq_sum)           # 即 sqrt(Σ (T - μ_T)^2)
-    if t_std < 1e-5:                    # 模板几乎是常数，放弃
-        return -1.0, (0, 0)
-
-    t_sum = tmpl.sum()
-
-    # 4. 互相关（不做翻转，直接用模板当核）
-    corr = cv2.filter2D(img, cv2.CV_64F, tmpl, anchor=(0,0))
-    corr = corr[: H - h + 1, : W - w + 1]
-
-    # 5. 合成 NCC，抑制低方差区域
-    numerator = corr - mean_I * t_sum
-    denominator = std_I * t_std
-
-    min_std = 1e-5                       # 可调，单位是像素值
-    valid = std_I > min_std
-    ncc_map = np.full_like(numerator, -1.0, dtype=np.float64)
-    ncc_map[valid] = numerator[valid] / (denominator[valid] + 1e-8)
-
-    max_idx = np.unravel_index(np.argmax(ncc_map), ncc_map.shape)
-    score = float(ncc_map[max_idx])
-    y, x = max_idx
-    return score, (x, y)
 
 def main():
     video_path = 'data/task1/anime_video.mp4'
@@ -97,7 +70,7 @@ def main():
     current_scale = 1.0
     target_center = (0, 0)
     target_w, target_h = 0, 0
-    trajectory = deque(maxlen=800)
+    trajectory = deque(maxlen=TRAJECTORY_MAXLEN)
     frame_count = 0
     frames_written = 0
 
@@ -119,13 +92,13 @@ def main():
                 if frame_count == 1:
                     print("第 1 帧：启动全局搜索（多尺度 + 多模板）...")
                     t_start = time.time()
-                search_scales = np.arange(0.5, 2.1, 0.25)
+                search_scales = GLOBAL_SEARCH_SCALES
                 search_img = gray
                 offset_x, offset_y = 0, 0
             else:
                 # ---------- 局部跟踪：只在上一帧位置附近搜索 ----------
-                search_scales = [current_scale * 0.9, current_scale, current_scale * 1.1]
-                padding = int(50 * current_scale)
+                search_scales = [current_scale * f for f in LOCAL_SCALE_FACTORS]
+                padding = int(LOCAL_SEARCH_PADDING * current_scale)
                 cx, cy = target_center
                 x1 = max(0, cx - target_w // 2 - padding)
                 y1 = max(0, cy - target_h // 2 - padding)
@@ -139,7 +112,7 @@ def main():
                 for idx, base_tmpl in enumerate(base_templates):
                     new_w = int(base_tmpl.shape[1] * scale)
                     new_h = int(base_tmpl.shape[0] * scale)
-                    if new_w < 10 or new_h < 10:
+                    if new_w < MIN_TEMPLATE_SIZE or new_h < MIN_TEMPLATE_SIZE:
                         continue
                     if new_w > search_img.shape[1] or new_h > search_img.shape[0]:
                         continue
@@ -158,7 +131,7 @@ def main():
                         best_match = (global_x, global_y, new_w, new_h, scale, idx)
 
             # ---------- 判断是否跟踪到目标 ----------
-            if best_score > 0.5:
+            if best_score > TRACKING_SCORE_THRESHOLD:
                 if not is_tracking:
                     elapsed = time.time() - t_start
                     print(f"锁定目标！帧序号 {frame_count}, 耗时 {elapsed:.1f} 秒, NCC={best_score:.3f}")
@@ -171,27 +144,27 @@ def main():
                 trajectory.append(target_center)
 
                 # 画框和文字
-                cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+                cv2.rectangle(frame, (x, y), (x + w, y + h), COLOR_GREEN, BOX_THICKNESS)
                 text = f"T{tmpl_idx+1} | scale={current_scale:.2f} | score={best_score:.2f}"
                 cv2.putText(frame, text, (x, y - 8),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
+                            FONT, FONT_SCALE_INFO, COLOR_GREEN, FONT_THICKNESS)
             else:
                 is_tracking = False
                 cv2.putText(frame, "Lost - searching whole frame",
-                            (30, 50), cv2.FONT_HERSHEY_SIMPLEX,
-                            0.9, (0, 0, 255), 2)
+                            LOST_TEXT_POS, FONT,
+                            FONT_SCALE_LOST, COLOR_RED, FONT_THICKNESS)
 
             # 绘制运动轨迹
             if len(trajectory) > 1:
                 pts = np.array(trajectory, np.int32).reshape((-1, 1, 2))
                 cv2.polylines(frame, [pts], isClosed=False,
-                              color=(0, 0, 255), thickness=2)
-                cv2.circle(frame, target_center, 4, (255, 0, 0), -1)
+                              color=COLOR_RED, thickness=TRAJECTORY_THICKNESS)
+                cv2.circle(frame, target_center, CIRCLE_RADIUS, COLOR_BLUE, -1)
 
             out.write(frame)
             frames_written += 1
 
-            if is_tracking and frame_count % 50 == 0:
+            if is_tracking and frame_count % PROGRESS_INTERVAL == 0:
                 print(f"  已跟踪 {frame_count} 帧...")
 
     except KeyboardInterrupt:

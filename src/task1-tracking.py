@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 import os
-from numpy.lib.stride_tricks import sliding_window_view
 from collections import deque
 import time
 
