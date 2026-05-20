@@ -508,6 +508,10 @@ def extract_template_from_ref(ref_path):
 #  主程序
 # ================================================================
 def main():
+    # 固定随机种子，确保跨平台 RANSAC / SIFT 结果一致
+    np.random.seed(0)
+    cv2.setRNGSeed(0)
+
     video_path = "data/task2/大疆无人机航拍视频.mp4"
     ref_image_path = "data/task2/大疆无人机航拍视频目标.png"
     output_dir = "output/improved/task2_road"
