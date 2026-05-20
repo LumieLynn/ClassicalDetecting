@@ -199,12 +199,33 @@ class RoadPathDetector:
         road_mask = (labels == largest_idx).astype(np.uint8) * 255
 
         # 逐行取左右边界中点 → 中心线
-        raw = []
-        for row in range(road_mask.shape[0]):
-            cols = np.where(road_mask[row, :] > 0)[0]
-            if len(cols) > 20:
-                xc = (cols[0] + cols[-1]) / 2.0
-                raw.append((float(xc), float(row + y0)))
+        def _extract_centerline(mask):
+            pts = []
+            for row in range(mask.shape[0]):
+                cols = np.where(mask[row, :] > 0)[0]
+                if len(cols) > 20:
+                    pts.append(((cols[0] + cols[-1]) / 2.0, float(row + y0)))
+            return pts
+
+        raw = _extract_centerline(road_mask)
+
+        # 跨平台校验：底部中心线如果跑到画面边缘，说明前景/背景反了
+        if len(raw) >= 10:
+            bottom_x = raw[-1][0]  # 最后一行的 x 坐标
+            if bottom_x < w * 0.1 or bottom_x > w * 0.9:
+                # 尝试反相
+                binary_inv = cv2.bitwise_not(binary)
+                num_labels2, labels2, stats2, _ = cv2.connectedComponentsWithStats(
+                    binary_inv, connectivity=8)
+                if num_labels2 >= 2:
+                    areas2 = stats2[1:, cv2.CC_STAT_AREA]
+                    idx2 = int(np.argmax(areas2)) + 1
+                    mask2 = (labels2 == idx2).astype(np.uint8) * 255
+                    raw_inv = _extract_centerline(mask2)
+                    if len(raw_inv) >= 10:
+                        bx2 = raw_inv[-1][0]
+                        if w * 0.1 <= bx2 <= w * 0.9:
+                            raw = raw_inv  # 反相后中心线合理，采用
 
         if len(raw) < 10:
             return False
