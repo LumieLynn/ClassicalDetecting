@@ -17,9 +17,9 @@ class KalmanTracker:
             [1, 0, 0, 0],
             [0, 1, 0, 0],
         ], np.float32)
-        # 过程噪声 → 预测不确定性
+        # 过程噪声 -> 预测不确定性
         self.kf.processNoiseCov = np.eye(4, dtype=np.float32) * 5.0
-        # 测量噪声 → 观测可信度
+        # 测量噪声 -> 观测可信度
         self.kf.measurementNoiseCov = np.eye(2, dtype=np.float32) * 10.0
         self.kf.errorCovPost = np.eye(4, dtype=np.float32) * 500.0
 

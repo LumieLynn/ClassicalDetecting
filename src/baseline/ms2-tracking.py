@@ -4,7 +4,7 @@ import os
 import time
 from collections import deque
 
-from ncc import fast_ncc_match
+from classical.ncc import fast_ncc_match
 
 # ======================== 模板提取参数 ========================
 TM_HSV_LOWER = np.array([75, 20, 20])

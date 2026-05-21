@@ -4,7 +4,7 @@ import os
 import time
 from collections import deque
 
-from ncc import fast_ncc_match
+from classical.ncc import fast_ncc_match
 
 # ======================== 可调参数 ========================
 GLOBAL_SEARCH_SCALES = np.arange(0.5, 2.1, 0.25)

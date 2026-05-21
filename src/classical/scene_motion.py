@@ -29,7 +29,7 @@ class SceneMotionEstimator:
         """对齐 prev_gray 到 curr_gray，返回 (foreground_prob_map, H, num_inliers)。
 
         foreground_prob_map: [0, 1]，运动目标区域高、静止场景低
-        H: 3×3 单应矩阵（prev → curr），失败时为 None
+        H: 3×3 单应矩阵（prev -> curr），失败时为 None
         num_inliers: RANSAC 内点数
         """
         if self.prev_gray is None:
@@ -58,7 +58,7 @@ class SceneMotionEstimator:
             except Exception:
                 aligned = self.prev_gray
 
-        # 帧差 → 前景概率图
+        # 帧差 -> 前景概率图
         diff = cv2.absdiff(curr_gray, aligned)
         _, mask = cv2.threshold(diff, _FG_DIFF_THRESH, 255, cv2.THRESH_BINARY)
         prob = cv2.GaussianBlur(mask.astype(np.float32) / 255.0,

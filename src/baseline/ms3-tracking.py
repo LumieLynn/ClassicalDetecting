@@ -4,7 +4,7 @@ import os
 import time
 from collections import deque
 
-from ncc import fast_ncc_match
+from classical.ncc import fast_ncc_match
 
 # ======================== CLAHE 参数 ========================
 CLAHE_CLIP_LIMIT = 3.0

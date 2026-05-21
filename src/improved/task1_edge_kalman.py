@@ -166,13 +166,13 @@ def main():
                 # 置信度融合
                 if edge_agree:
                     # 两条线索一致：高置信度
-                    conf = 0.5 * ncc_score + 0.5 * max(0, edge_score)
+                    _conf = 0.5 * ncc_score + 0.5 * max(0, edge_score)  # unused
                     # 微调位置（NCC 和边缘的平均）
                     final_cx = int(0.6 * best_center[0] + 0.4 * edge_center[0])
                     final_cy = int(0.6 * best_center[1] + 0.4 * edge_center[1])
                 else:
                     # 只有 NCC 可信
-                    conf = ncc_score
+                    # conf = ncc_score  (unused)
                     final_cx, final_cy = best_center
 
                 if ncc_score > NCC_TRACK_THRESHOLD:
