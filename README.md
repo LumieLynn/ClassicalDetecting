@@ -12,7 +12,7 @@
 2. 大疆无人机航拍视频：识别图像中的指定车辆目标，要求不能错误识别到其他车辆物体。车辆在“大疆无人机航拍视频目标”中已经用蓝色圆圈标识出，要求识别出车辆在图中的运动全过程直至目标消失，并画出轨迹。
 3. 大疆无人机航拍骑车人：识别图像中的指定骑车人，要求不能错误识别到其他物体。车辆在“大疆无人机航拍骑车人目标”中已经用黄色圆圈标识出，要求识别出骑车人在图中的运动全过程直至其消失，并画出轨迹。
 ```
-解法思路为先在ncc的基础上利用NCC与相位相关实现一组baseline；在baseline的基础上，利用SIFT与Kalman滤波，对任务二、任务三添加基于路面检测的运动约束，摆脱对硬编码参数的依赖。
+解法思路为先在 NCC 的基础上利用 NCC 与相位相关实现一组 baseline；在 baseline 的基础上，对任务一引入边缘倒角距离匹配 + Kalman 平滑；对任务二、三添加基于路面检测的运动约束，摆脱对硬编码参数的依赖；对任务四（无人机），由于目标极小且融入背景、无法使用 NCC 模板匹配，转而利用帧差运动区域的最大连通域面积区分无人机与树叶振荡。
 
 由于task2的视频为夜间道路，针对其明显的像素亮度差异，对该问题的道路识别有两解，效果请参照下列示例输出。但需要注意，因ffmpeg在各平台的Otsu算法实现原理不同，检测结果会有偏差。若想完美复现，建议参考实验环境为Ubuntu 26.04 LTS，Python 3.14。
 
@@ -40,6 +40,13 @@ uv run python src/improved/task3_auto_road_tracker.py
 
 ## 结果
 
+### Task 1 — 动漫模板追踪
+
+| 版本 | 视频 |
+|------|------|
+| baseline | [example-outputs/baseline/task1_result.mp4](example-outputs/baseline/task1_result.mp4) |
+| 边缘 + Kalman | [example-outputs/improved/task1_result.mp4](example-outputs/improved/task1_result.mp4) |
+
 ### Task 2 — 夜间道路车辆追踪
 
 | 版本 | 视频 |
@@ -55,12 +62,13 @@ uv run python src/improved/task3_auto_road_tracker.py
 | baseline | [example-outputs/baseline/task3/tracked_result.mp4](example-outputs/baseline/task3/tracked_result.mp4) |
 | 自动路检 + SIFT | [example-outputs/improved/task3_auto_road/tracked_result.mp4](example-outputs/improved/task3_auto_road/tracked_result.mp4) |
 
-### Task 1 — 动漫模板追踪
+### Task 4 — 地面光学站无人机追踪
 
 | 版本 | 视频 |
 |------|------|
-| baseline | [example-outputs/baseline/task1_result.mp4](example-outputs/baseline/task1_result.mp4) |
-| 边缘 + Kalman | [example-outputs/improved/task1_result.mp4](example-outputs/improved/task1_result.mp4) |
+| 帧差 + 光流辅助 | [example-outputs/improved/task4_tracked_result.mp4](example-outputs/improved/task4_tracked_result.mp4) |
+
+树叶振荡方向反复翻转，无人机定向飞行。利用帧差提取运动区域后，树叶产生的连通域离散且面积小，而无人机运动集中、连通域面积大。取最大连通域即得到无人机位置，丢失时由 LK 光流网格点辅助跟踪，无人机急停时光流位移自然归零，不会像 Kalman 恒速模型那样冲过头。
 
 ## 方法
 
@@ -70,6 +78,8 @@ uv run python src/improved/task3_auto_road_tracker.py
 | `improved/task2_otsu_tracker.py` | Otsu 路检 + 道路坐标 + 遮挡状态机 |
 | `improved/task2_constrained_tracker.py` | 路面蒙版约束 NCC + 统一 search_target() |
 | `improved/task3_auto_road_tracker.py` | 车辆引导自动路检 + SIFT 蒙版跟踪 + 统一搜索 |
+| `improved/task4_framediff_of_tracker.py` | 帧差 + 最大连通域面积 + LK 光流辅助 |
+| `improved/task2_optical_flow.py` | [实验] 双通道 KLT（目标 + 路面）→ 相对运动 |
 
 ## 共享库
 
