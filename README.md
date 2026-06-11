@@ -76,7 +76,7 @@ uv run python src/improved/task3_auto_road_tracker.py
 |------|----------|
 | `improved/task1_edge_kalman.py` | NCC + 边缘倒角距离 + Kalman 平滑 |
 | `improved/task2_otsu_tracker.py` | Otsu 路检 + 道路坐标 + 遮挡状态机 |
-| `improved/task2_constrained_tracker.py` | 路面蒙版约束 NCC + 统一 search_target() |
+| `improved/task2_constrained_tracker.py` | Canny+Hough 路检 + 路面蒙版约束 NCC |
 | `improved/task3_auto_road_tracker.py` | 车辆引导自动路检 + SIFT 蒙版跟踪 + 统一搜索 |
 | `improved/task4_framediff_of_tracker.py` | 帧差 + 最大连通域面积 + LK 光流辅助 |
 | `improved/task2_optical_flow.py` | [实验] 双通道 KLT（目标 + 路面）→ 相对运动 |
